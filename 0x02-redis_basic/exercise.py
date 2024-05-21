@@ -1,32 +1,43 @@
 #!/usr/bin/env python3
-'''A module for using the Redis NoSQL data storage.
-'''
-import uuid
+"""Module declares a redis class and methods"""
 import redis
+from uuid import uuid4
+from typing import Union, Callable, Optional
 from functools import wraps
-from typing import Any, Callable, Union
 
 
 def count_calls(method: Callable) -> Callable:
-    '''Tracks the number of calls made to a method in a Cache class.
-    '''
+    '''count how many times methods of Cache class are called'''
+    key = method.__qualname__
+
     @wraps(method)
-    def invoker(self, *args, **kwargs) -> Any:
-        '''Invokes the given method after incrementing its call counter.
-        '''
-        if isinstance(self._redis, redis.Redis):
-            self._redis.incr(method.__qualname__)
+    def wrapper(self, *args, **kwargs):
+        '''wrap the decorated function and return the wrapper'''
+        self._redis.incr(key)
         return method(self, *args, **kwargs)
-    return invoker
+    return wrapper
 
 
 def call_history(method: Callable) -> Callable:
-    '''Tracks the call details of a method in a Cache class.
-    '''
+    '''store the history of inputs and outputs for a particular function'''
     @wraps(method)
-    def invoker(self, *args, **kwargs) -> Any:
-        '''Returns the method's output after storing its inputs and output.
-        '''
-        in_key = '{}:inputs'.format(method.__qualname__)
-        out_key = '{}:outputs'.format(method.__qualname__)
+    def wrapper(self, *args, **kwargs):
+        '''wrap the decorated function and return the wrapper'''
+        input = str(args)
+        self._redis.rpush(method.__qualname__ + ":inputs", input)
+        output = str(method(self, *args, **kwargs))
+        self._redis.rpush(method.__qualname__ + ":outputs", output)
+        return output
+    return wrapper
+
+
+def replay(fn: Callable):
+    '''display the history of calls of a particular function.'''
+    r = redis.Redis()
+    func_name = fn.__qualname__
+    c = r.get(func_name)
+    try:
+        c = int(c.decode("utf-8"))
+    except Exception:
+        c = 0
 
