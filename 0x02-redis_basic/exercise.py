@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """Module declares a redis class and methods"""
 import redis
@@ -38,6 +39,4 @@ def replay(fn: Callable):
     c = r.get(func_name)
     try:
         c = int(c.decode("utf-8"))
-    except Exception:
-        c = 0
 
